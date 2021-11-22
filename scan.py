@@ -23,12 +23,11 @@ def normal_scan(addresses):
     print(f'Scanning {len(addr_list)} addresses -> {addr_list[0]} - {addr_list[-1]}')
 
     for addr in addr_list:
-        print(scan_addr(addr))
+        print(addr, ":\t" ,scan_addr(addr))
 
 def scan_addr(ip):
-   result = ping(ip, count=1)
-
-   return result
+   result = ping(ip, count=1,verbose=False)
+   return result.success()
 
 def gen_addr(addr_list):
     if len(addr_list) == 0:
