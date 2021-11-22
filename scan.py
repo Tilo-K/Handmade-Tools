@@ -5,8 +5,10 @@
 from pythonping import ping
 from socket import socket
 import argparse
+import asyncio
+import progressbar
 
-def main():
+async def main():
     parser = argparse.ArgumentParser(description="A hand made tool to scan a Network")
     parser.add_argument('addresses', metavar='address',type=str, help='The address space to be scanned.')
 
@@ -14,20 +16,38 @@ def main():
 
     addresses = args.addresses
 
-    normal_scan(addresses)
+    await normal_scan(addresses)
 
 
-def normal_scan(addresses):
+async def normal_scan(addresses):
     addr_list = gen_addr([addresses])
-
+    results = []
     print(f'Scanning {len(addr_list)} addresses -> {addr_list[0]} - {addr_list[-1]}')
 
-    for addr in addr_list:
-        print(addr, ":\t" ,scan_addr(addr))
+    tasks = []
 
-def scan_addr(ip):
-   result = ping(ip, count=1,verbose=False)
-   return result.success()
+    for addr in addr_list:
+        task = asyncio.create_task(scan_addr(addr))
+        tasks.append(task)
+
+    with progressbar.ProgressBar(max_value=len(tasks)) as bar:
+        for i, task in enumerate(tasks):
+            results.append(await task)
+            bar.update(i)
+        
+
+    for res in results:
+        if res['up']:
+            print(res['addr'])
+
+async def scan_addr(ip):
+   result = ping(ip, count=1,verbose=False, timeout=0.5)
+   res = {'up': result.success(), 'addr': ip}
+   return res
+
+async def scan_port(ip,port):
+    s = socket.socket()
+    pass
 
 def gen_addr(addr_list):
     if len(addr_list) == 0:
@@ -44,4 +64,4 @@ def gen_addr(addr_list):
     return gen_addr(ret_list)
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
