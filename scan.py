@@ -7,27 +7,35 @@ from socket import socket
 import argparse
 from threading import Thread
 import progressbar
+import time
+
+MAX_THREADS = 25
 
 def main():
     parser = argparse.ArgumentParser(description="A hand made tool to scan a Network")
     parser.add_argument('addresses', metavar='address',type=str, help='The address space to be scanned.')
+    parser.add_argument('--ports', dest='ports', action='store_true')
+    parser.set_defaults(ports=False)
 
     args = parser.parse_args()
 
     addresses = args.addresses
+    port_scan = args.ports
+    normal_scan(addresses, port_scan)
 
-    normal_scan(addresses)
 
-
-def normal_scan(addresses):
+def normal_scan(addresses, port_scan):
     addr_list = gen_addr([addresses])
     results = []
     print(f'Scanning {len(addr_list)} addresses -> {addr_list[0]} - {addr_list[-1]}')
 
     threads = []
+    
+    for addr in progressbar.progressbar(addr_list):
+        if len(threads) > MAX_THREADS:
+            threads.pop(0).join()
 
-    for addr in addr_list:
-        thread = Thread(target=scan_addr, args=(addr, results))
+        thread = Thread(target=scan_addr, args=(addr,port_scan, results))
         thread.start()
         threads.append(thread)
 
@@ -36,19 +44,41 @@ def normal_scan(addresses):
             thread.join()
             bar.update(i)
         
-
+    results = sorted(results, key=lambda x: int(x['addr'].replace('.','')))
     for res in results:
         if res['up']:
             print(res['addr'])
+            if port_scan:
+                print(res['ports'])
 
-def scan_addr(ip, results):
-   result = ping(ip, count=1,verbose=False, timeout=0.5)
-   res = {'up': result.success(), 'addr': ip}
-   results.append(res)
+def scan_addr(ip, port_scan, results):
+    try:
+        result = ping(ip, count=3,verbose=False, timeout=1)
+        ports = []
+        threads = []
+        
+        if result.success() and port_scan:
+            for port in [21,22,80,443,110,993,25,587,3306]:       
+                thread = Thread(target=scan_port, args=(ip,port,ports))
+                thread.start()
+                threads.append(thread)
+                
+            for thread in threads:
+                thread.join()
+        
+        res = {'up': result.success(), 'addr': ip, 'ports': ports}
+        results.append(res)
+    except:
+        pass
 
-def scan_port(ip,port):
-    s = socket.socket()
-    pass
+def scan_port(ip,port, results):
+    s = socket()
+    try:
+        s.connect((ip,port))
+        s.close()
+        results.append(port)
+    except:
+        pass
 
 def gen_addr(addr_list):
     if len(addr_list) == 0:
