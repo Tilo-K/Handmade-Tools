@@ -3,13 +3,13 @@
 # @author Tilo-K
 
 from pythonping import ping
-from socket import socket
+import socket
 import argparse
 from threading import Thread
 import progressbar
-import time
+from termcolor import colored
 
-MAX_THREADS = 25
+MAX_THREADS = 50
 
 def main():
     parser = argparse.ArgumentParser(description="A hand made tool to scan a Network")
@@ -25,6 +25,11 @@ def main():
 
 
 def normal_scan(addresses, port_scan):
+    try:
+        int(addresses.replace('.','').replace('*',''))
+    except:
+        addresses = socket.gethostbyname(addresses)
+        
     addr_list = gen_addr([addresses])
     results = []
     print(f'Scanning {len(addr_list)} addresses -> {addr_list[0]} - {addr_list[-1]}')
@@ -47,9 +52,10 @@ def normal_scan(addresses, port_scan):
     results = sorted(results, key=lambda x: int(x['addr'].replace('.','')))
     for res in results:
         if res['up']:
-            print(res['addr'])
+            print(colored(res['addr'], 'blue'), colored(res['hostname'], 'red'))
             if port_scan:
-                print(res['ports'])
+                for port in res['ports']:
+                    print("  -> ",colored(port, 'green'))
 
 def scan_addr(ip, port_scan, results):
     try:
@@ -65,14 +71,20 @@ def scan_addr(ip, port_scan, results):
                 
             for thread in threads:
                 thread.join()
+        hostname = ""
         
-        res = {'up': result.success(), 'addr': ip, 'ports': ports}
+        try:
+            hostname = socket.gethostbyaddr(ip)[0]
+        except:
+            pass
+        
+        res = {'up': result.success(), 'addr': ip, 'ports': sorted(ports), 'hostname': hostname}
         results.append(res)
-    except:
+    except Exception as e:
         pass
 
 def scan_port(ip,port, results):
-    s = socket()
+    s = socket.socket()
     try:
         s.connect((ip,port))
         s.close()
