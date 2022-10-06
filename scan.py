@@ -103,7 +103,7 @@ def gen_addr(addr_list):
 
     ret_list = []
     for addr in addr_list:
-        for i in range(1, 256):
+        for i in range(0, 256):
             ip = addr.replace('*', str(i), 1)
             ret_list.append(ip)
 
