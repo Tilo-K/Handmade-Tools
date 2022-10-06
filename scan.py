@@ -76,17 +76,19 @@ async def scan_addr(ip, port_scan, results):
             await asyncio.gather(*tasks)
         hostname = ""
 
-        try:
-            hostname = socket.gethostbyaddr(ip)[0]
-        except:
-            pass
+        if result is not None:
+            try:
+                hostname = socket.gethostbyaddr(ip)[0]
+            except:
+                pass
 
         res = {'up': result is not None, 'addr': ip, 'ports': sorted(ports),
                'hostname': hostname}
         print('Scanned ip: ', ip, ' '*10, end='\r')
         results.append(res)
     except Exception as e:
-        print(e)
+        if 'Host is down' not in str(e):
+            print(e)
 
 
 async def scan_port(ip, port, results):
