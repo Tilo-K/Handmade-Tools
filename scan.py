@@ -2,12 +2,15 @@
 
 # @author Tilo-K
 
-from pythonping import ping
+from gufo.ping import Ping
 import socket
 import argparse
 import asyncio
 import progressbar
+import os
 from termcolor import colored
+
+ping = Ping()
 
 
 async def main():
@@ -45,6 +48,8 @@ async def normal_scan(addresses, port_scan):
     await asyncio.gather(*tasks)
 
     results = sorted(results, key=lambda x: int(x['addr'].replace('.', '')))
+    columns, _ = os.get_terminal_size()
+    print('\n' + '*'*columns)
     for res in results:
         if res['up']:
             print(colored(res['addr'], 'blue'),
@@ -56,11 +61,11 @@ async def normal_scan(addresses, port_scan):
 
 async def scan_addr(ip, port_scan, results):
     try:
-        result = ping(ip, count=3, verbose=False, timeout=1)
+        result = await ping.ping(ip)
         ports = []
         tasks = []
 
-        if result.success() and port_scan:
+        if result is not None and port_scan:
             for port in [21, 22, 80, 443, 110, 993, 25, 587, 3306]:
                 task = asyncio.create_task(scan_port(ip, port, ports))
                 tasks.append(task)
@@ -73,9 +78,9 @@ async def scan_addr(ip, port_scan, results):
         except:
             pass
 
-        res = {'up': result.success(), 'addr': ip, 'ports': sorted(ports),
+        res = {'up': result is not None, 'addr': ip, 'ports': sorted(ports),
                'hostname': hostname}
-        print(res)
+        print('Scanned ip: ', ip, ' '*10, end='\r')
         results.append(res)
     except Exception as e:
         print(e)
