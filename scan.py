@@ -5,15 +5,16 @@
 from pythonping import ping
 import socket
 import argparse
-from threading import Thread
+import asyncio
 import progressbar
 from termcolor import colored
 
-MAX_THREADS = 50
 
-def main():
-    parser = argparse.ArgumentParser(description="A hand made tool to scan a Network")
-    parser.add_argument('addresses', metavar='address',type=str, help='The address space to be scanned.')
+async def main():
+    parser = argparse.ArgumentParser(
+        description="A hand made tool to scan a Network")
+    parser.add_argument('addresses', metavar='address',
+                        type=str, help='The address space to be scanned.')
     parser.add_argument('--ports', dest='ports', action='store_true')
     parser.set_defaults(ports=False)
 
@@ -21,90 +22,89 @@ def main():
 
     addresses = args.addresses
     port_scan = args.ports
-    normal_scan(addresses, port_scan)
+    await normal_scan(addresses, port_scan)
 
 
-def normal_scan(addresses, port_scan):
+async def normal_scan(addresses, port_scan):
     try:
-        int(addresses.replace('.','').replace('*',''))
-    except:
+        int(addresses.replace('.', '').replace('*', ''))
+    except ValueError:
         addresses = socket.gethostbyname(addresses)
-        
+
     addr_list = gen_addr([addresses])
     results = []
-    print(f'Scanning {len(addr_list)} addresses -> {addr_list[0]} - {addr_list[-1]}')
+    print(
+        f'Scanning {len(addr_list)} addresses -> {addr_list[0]} - {addr_list[-1]}')
 
-    threads = []
-    
+    tasks = []
+
     for addr in progressbar.progressbar(addr_list):
-        if len(threads) > MAX_THREADS:
-            threads.pop(0).join()
+        task = asyncio.create_task(scan_addr(addr, port_scan, results))
+        tasks.append(task)
 
-        thread = Thread(target=scan_addr, args=(addr,port_scan, results))
-        thread.start()
-        threads.append(thread)
+    await asyncio.gather(*tasks)
 
-    with progressbar.ProgressBar(max_value=len(threads)) as bar:
-        for i, thread in enumerate(threads):
-            thread.join()
-            bar.update(i)
-        
-    results = sorted(results, key=lambda x: int(x['addr'].replace('.','')))
+    results = sorted(results, key=lambda x: int(x['addr'].replace('.', '')))
     for res in results:
         if res['up']:
-            print(colored(res['addr'], 'blue'), colored(res['hostname'], 'red'))
+            print(colored(res['addr'], 'blue'),
+                  colored(res['hostname'], 'red'))
             if port_scan:
                 for port in res['ports']:
-                    print("  -> ",colored(port, 'green'))
+                    print("  -> ", colored(port, 'green'))
 
-def scan_addr(ip, port_scan, results):
+
+async def scan_addr(ip, port_scan, results):
     try:
-        result = ping(ip, count=3,verbose=False, timeout=1)
+        result = ping(ip, count=3, verbose=False, timeout=1)
         ports = []
-        threads = []
-        
+        tasks = []
+
         if result.success() and port_scan:
-            for port in [21,22,80,443,110,993,25,587,3306]:       
-                thread = Thread(target=scan_port, args=(ip,port,ports))
-                thread.start()
-                threads.append(thread)
-                
-            for thread in threads:
-                thread.join()
+            for port in [21, 22, 80, 443, 110, 993, 25, 587, 3306]:
+                task = asyncio.create_task(scan_port(ip, port, ports))
+                tasks.append(task)
+
+            await asyncio.gather(*tasks)
         hostname = ""
-        
+
         try:
             hostname = socket.gethostbyaddr(ip)[0]
         except:
             pass
-        
-        res = {'up': result.success(), 'addr': ip, 'ports': sorted(ports), 'hostname': hostname}
+
+        res = {'up': result.success(), 'addr': ip, 'ports': sorted(ports),
+               'hostname': hostname}
+        print(res)
         results.append(res)
     except Exception as e:
-        pass
+        print(e)
 
-def scan_port(ip,port, results):
+
+async def scan_port(ip, port, results):
     s = socket.socket()
     try:
-        s.connect((ip,port))
+        s.connect((ip, port))
         s.close()
         results.append(port)
-    except:
+    except ConnectionError:
         pass
+
 
 def gen_addr(addr_list):
     if len(addr_list) == 0:
         return addr_list
-    if not '*' in addr_list[0]:
+    if '*' not in addr_list[0]:
         return addr_list
 
     ret_list = []
     for addr in addr_list:
-        for i in range(1,256):
+        for i in range(1, 256):
             ip = addr.replace('*', str(i), 1)
             ret_list.append(ip)
 
     return gen_addr(ret_list)
 
+
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
