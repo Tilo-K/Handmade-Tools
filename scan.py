@@ -44,6 +44,10 @@ async def normal_scan(addresses, port_scan):
         task = asyncio.create_task(scan_addr(addr, port_scan, results))
         tasks.append(task)
 
+        if len(tasks) > 1000:
+            await asyncio.gather(*tasks)
+            tasks = []
+
     await asyncio.gather(*tasks)
 
     results = sorted(results, key=lambda x: int(x['addr'].replace('.', '')))
