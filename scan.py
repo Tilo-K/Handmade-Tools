@@ -6,7 +6,6 @@ from gufo.ping import Ping
 import socket
 import argparse
 import asyncio
-import progressbar
 import os
 from termcolor import colored
 
@@ -41,7 +40,7 @@ async def normal_scan(addresses, port_scan):
 
     tasks = []
 
-    for addr in progressbar.progressbar(addr_list):
+    for addr in addr_list:
         task = asyncio.create_task(scan_addr(addr, port_scan, results))
         tasks.append(task)
 
@@ -49,7 +48,7 @@ async def normal_scan(addresses, port_scan):
 
     results = sorted(results, key=lambda x: int(x['addr'].replace('.', '')))
     columns, _ = os.get_terminal_size()
-    print('\n' + '*'*columns)
+    print('\n\n' + colored('*'*columns, 'blue'))
     for res in results:
         if res['up']:
             print(colored(res['addr'], 'blue'),

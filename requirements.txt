@@ -1,0 +1,3 @@
+gufo-ping
+termcolor
+pyinstaller
